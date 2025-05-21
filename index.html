@@ -4,50 +4,173 @@
   <title>Pixel Weaver</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
   <style>
-    body { display: flex; justify-content: center; background: #f0f0f0; }
-    canvas { border: 2px solid #333; }
+    body { 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      background: #1a3c5e; /* Malaysian blue */
+      font-family: 'Poppins', sans-serif;
+    }
+    canvas { 
+      border: 4px solid #ffcc00; /* Malaysian yellow */
+      margin-top: 20px;
+    }
+    h1 { color: #ffffff; }
+    button { 
+      padding: 10px 20px; 
+      font-size: 18px; 
+      background: #d32f2f; /* Malaysian red */
+      color: white; 
+      border: none; 
+      cursor: pointer;
+    }
+    button:hover { background: #b71c1c; }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <script>
-    let tile = { x: 50, y: 50, size: 40, isDragging: false };
-    let target = { x: 200, y: 200 }; // Target position for tile
+    let gameState = 'start';
+    let tiles = [];
+    let gridSize = 5;
+    let tileSize = 60;
+    let timer = 60;
+    let score = 0;
+    let lastSecond = 0;
+    // Batik-inspired target pattern
+    let targetPattern = [
+      [0, 1, 1, 0, 0],
+      [1, 2, 2, 1, 0],
+      [1, 2, 1, 2, 1],
+      [0, 1, 2, 2, 1],
+      [0, 0, 1, 1, 0]
+    ];
+    let playerPattern = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
 
     function setup() {
       createCanvas(400, 400);
+      // Initialize tiles (randomly placed for now)
+      for (let i = 0; i < 8; i++) {
+        tiles.push({
+          x: random(0, width - tileSize),
+          y: random(0, height - tileSize),
+          color: floor(random(1, 3)), // 1 = red, 2 = blue
+          isDragging: false
+        });
+      }
     }
 
     function draw() {
       background(255);
-      // Draw target area
-      fill(200, 200, 255);
-      rect(target.x, target.y, tile.size, tile.size);
-      // Draw draggable tile
-      fill(255, 100, 100);
-      rect(tile.x, tile.y, tile.size, tile.size);
-      // Check if tile is in target
-      if (abs(tile.x - target.x) < 10 && abs(tile.y - target.y) < 10) {
-        text("Correct!", 20, 20);
+      if (gameState === 'start') {
+        textSize(32);
+        fill(0);
+        textAlign(CENTER);
+        text('Pixel Weaver', width / 2, height / 3);
+        textSize(20);
+        text('Arrange tiles to match the batik pattern!', width / 2, height / 2);
+      } else if (gameState === 'playing') {
+        // Draw grid
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize; j++) {
+            fill(220);
+            rect(i * tileSize, j * tileSize, tileSize, tileSize);
+            // Show target pattern faintly
+            if (targetPattern[j][i] === 1) fill(255, 100, 100, 100);
+            else if (targetPattern[j][i] === 2) fill(100, 100, 255, 100);
+            else fill(255, 255, 255, 100);
+            rect(i * tileSize, j * tileSize, tileSize, tileSize);
+          }
+        }
+        // Draw tiles
+        for (let tile of tiles) {
+          if (tile.color === 1) fill(255, 100, 100);
+          else fill(100, 100, 255);
+          rect(tile.x, tile.y, tileSize, tileSize);
+        }
+        // Update timer
+        if (frameCount % 60 === 0) timer--;
+        if (timer <= 0) gameState = 'gameover';
+        // Draw HUD
+        textSize(20);
+        fill(0);
+        text(`Time: ${timer}s`, 20, 30);
+        text(`Score: ${score}`, 20, 60);
+      } else if (gameState === 'gameover') {
+        textSize(32);
+        fill(0);
+        textAlign(CENTER);
+        text('Game Over!', width / 2, height / 3);
+        text(`Score: ${score}`, width / 2, height / 2);
       }
     }
 
     function mousePressed() {
-      if (mouseX > tile.x && mouseX < tile.x + tile.size &&
-          mouseY > tile.y && mouseY < tile.y + tile.size) {
-        tile.isDragging = true;
+      if (gameState === 'playing') {
+        for (let tile of tiles) {
+          if (mouseX > tile.x && mouseX < tile.x + tileSize &&
+              mouseY > tile.y && mouseY < tile.y + tileSize) {
+            tile.isDragging = true;
+            break;
+          }
+        }
       }
     }
 
     function mouseReleased() {
-      tile.isDragging = false;
+      if (gameState === 'playing') {
+        for (let tile of tiles) {
+          if (tile.isDragging) {
+            tile.isDragging = false;
+            // Snap to grid
+            let gridX = floor(tile.x / tileSize);
+            let gridY = floor(tile.y / tileSize);
+            if (gridX >= 0 && gridX < gridSize && gridY >= 0 && gridY < gridSize) {
+              tile.x = gridX * tileSize;
+              tile.y = gridY * tileSize;
+              // Update player pattern
+              playerPattern[gridY][gridX] = tile.color;
+              // Check score
+              score = 0;
+              for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                  if (playerPattern[i][j] === targetPattern[i][j]) score += 10;
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     function mouseDragged() {
-      if (tile.isDragging) {
-        tile.x = mouseX - tile.size / 2;
-        tile.y = mouseY - tile.size / 2;
+      if (gameState === 'playing') {
+        for (let tile of tiles) {
+          if (tile.isDragging) {
+            tile.x = mouseX - tileSize / 2;
+            tile.y = mouseY - tileSize / 2;
+          }
+        }
+      }
+    }
+
+    function startGame() {
+      gameState = 'playing';
+      timer = 60;
+      score = 0;
+      playerPattern = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+      tiles = [];
+      for (let i = 0; i < 8; i++) {
+        tiles.push({
+          x: random(0, width - tileSize),
+          y: random(0, height - tileSize),
+          color: floor(random(1, 3)),
+          isDragging: false
+        });
       }
     }
   </script>
+  <h1>Pixel Weaver</h1>
+  <button onclick="startGame()">Start Game</button>
 </body>
 </html>
